@@ -1,0 +1,98 @@
+# Constants representing grade points for each grade
+GRADE_POINTS = {
+    'A': 4,
+    'B': 3,
+    'C': 2,
+    'D': 1,
+    'F': 0
+}
+
+def get_grade_point(grade):
+    """
+    Given a grade (one character string), return the corresponding grade point.
+    If the grade is invalid, return None.
+    """
+    return GRADE_POINTS.get(grade.upper(), None)
+
+def calculate_gpa(total_points, total_credits):
+    """
+    Calculate the GPA by dividing total points by total credits.
+    If total_credits is 0, return 0 to avoid division by zero error.
+    """
+    if total_credits == 0:
+        return 0
+    return total_points / total_credits
+
+def process_student():
+    """
+    Process a student's information, including courses, grades, and GPA.
+    """
+    # Input student name and ID
+    name = input("Enter the student's name: ")
+    student_id = int(input("Enter the student ID (0-9999): "))
+    while student_id < 0 or student_id > 9999:
+        print("Invalid ID. Please enter an ID between 0 and 9999.")
+        student_id = int(input("Enter the student ID (0-9999): "))
+
+    num_courses = int(input("Enter the number of courses (0-5): "))
+    while num_courses < 0 or num_courses > 5:
+        print("Invalid number of courses. Please enter a number between 0 and 5.")
+        num_courses = int(input("Enter the number of courses (0-5): "))
+
+    total_points = 0
+    total_credits = 0
+
+    # Loop over the number of courses
+    for i in range(num_courses):
+        print(f"\nEnter details for course {i + 1}:")
+        course_number = input("Enter the course number (e.g., BU 101): ")
+        credits = int(input("Enter the number of credits for the course: "))
+        
+        while credits <= 0:
+            print("Credits must be a positive integer.")
+            credits = int(input("Enter the number of credits for the course: "))
+
+        grade = input("Enter the grade for the course (A, B, C, D, F): ").upper()
+
+        # Validate grade input
+        while grade not in GRADE_POINTS:
+            print("Invalid grade. Please enter one of the following grades: A, B, C, D, F.")
+            grade = input("Enter the grade for the course (A, B, C, D, F): ").upper()
+
+        # Calculate points for this course
+        grade_points = get_grade_point(grade)
+        total_points += grade_points * credits
+        total_credits += credits
+
+    # Calculate GPA
+    gpa = calculate_gpa(total_points, total_credits)
+
+    # Output student details and GPA
+    print(f"\n{ '=' * 30 }")
+    print(f"Student Name: {name}")
+    print(f"Student ID: {student_id}")
+    print(f"Total Credits: {total_credits}")
+    print(f"GPA: {gpa:.2f}")
+    
+    if gpa < 2.0:
+        print("Warning: Your GPA is below 2.0. Please consider improving your grades.")
+    elif gpa >= 3.0:
+        print("Congratulations! Your GPA is above 3.0. Great job!")
+    else:
+        print("Keep up the good work!")
+
+    print(f"{ '=' * 30 }")
+
+def main():
+    """
+    Main loop to process multiple students.
+    """
+    while True:
+        process_student()
+        another = input("Do you want to process another student? (Y/N): ").strip().lower()
+        if another != 'y':
+            break
+
+# Run the program
+if __name__ == "__main__":
+    main()
