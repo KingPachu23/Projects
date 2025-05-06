@@ -1,0 +1,13 @@
+const movie = {
+    title: '0101',
+    releaseYear: '2026',
+    rating: '5.0',
+    director: 'Binarius'
+};
+
+showPropperties(movie);
+
+function showPropperties(obj) {
+    for (let key in obj)
+        if (typeof obj[key] === 'string')
+            console.log(key, obj[key]);
