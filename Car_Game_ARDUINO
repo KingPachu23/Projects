@@ -1,0 +1,238 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <EEPROM.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#define POT_PIN A0
+#define BUZZER_PIN 6
+#define PAUSE_BUTTON 4
+
+const int playerY = SCREEN_HEIGHT - 8;
+const int playerWidth = 10;
+const int playerHeight = 4;
+
+int playerX;
+int score = 0;
+int highScore = 0;
+int lives = 1;
+bool gameOver = false;
+bool isPaused = false;
+bool welcomeShown = false;
+
+struct Obstacle {
+  int x, y, w, h, speed;
+};
+
+const int numObstacles = 5;
+Obstacle obstacles[numObstacles];
+int maxObstacleSpeed = 5;
+
+void setup() {
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(PAUSE_BUTTON, INPUT_PULLUP);
+  digitalWrite(BUZZER_PIN, LOW);
+
+  Serial.begin(9600);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("OLED not found"));
+    while (true);
+  }
+
+  display.setTextColor(SSD1306_WHITE);
+
+  highScore = EEPROM.read(0);
+  if (!welcomeShown) {
+    showWelcome();
+    welcomeShown = true;
+  }
+
+  resetGame();
+  showCountdown();
+}
+
+void loop() {
+  static bool lastPauseState = HIGH;
+  bool currentPauseState = digitalRead(PAUSE_BUTTON);
+
+  if (lastPauseState == HIGH && currentPauseState == LOW) {
+    isPaused = !isPaused;
+    delay(200);
+  }
+  lastPauseState = currentPauseState;
+
+  if (isPaused) {
+    showPauseMenu();
+    noTone(BUZZER_PIN);
+    return;
+  }
+
+  if (gameOver) {
+    noTone(BUZZER_PIN);
+    showGameOver();
+    return;
+  }
+
+  int potValue = analogRead(POT_PIN);
+  playerX = map(potValue, 0, 1023, 0, SCREEN_WIDTH - playerWidth);
+
+  for (int i = 0; i < numObstacles; i++) {
+    obstacles[i].y += obstacles[i].speed;
+    if (obstacles[i].y > SCREEN_HEIGHT) {
+      resetObstacle(obstacles[i]);
+      score++;
+      if (score % 25 == 0 && maxObstacleSpeed < 7) {
+        maxObstacleSpeed++;
+      }
+    }
+    if (playerX < obstacles[i].x + obstacles[i].w &&
+        playerX + playerWidth > obstacles[i].x &&
+        playerY < obstacles[i].y + obstacles[i].h &&
+        playerY + playerHeight > obstacles[i].y) {
+      if (lives > 0) {
+        lives--;
+        tone(BUZZER_PIN, 200, 200);
+        flashScreen();
+      }
+      if (lives == 0) gameOver = true;
+    }
+  }
+
+  drawEverything();
+  delay(40);
+}
+
+void drawEverything() {
+  display.clearDisplay();
+  display.fillRect(playerX, playerY, playerWidth, playerHeight, SSD1306_WHITE);
+  for (int i = 0; i < numObstacles; i++) {
+    display.fillRect(obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, SSD1306_WHITE);
+  }
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.print("Score: ");
+  display.print(score);
+  display.setCursor(0, 10);
+  display.print("High: ");
+  display.print(highScore);
+  display.setCursor(0, 20);
+  display.print("Lives: ");
+  display.print(lives);
+  display.display();
+}
+
+void flashScreen() {
+  display.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SSD1306_WHITE);
+  display.display();
+  delay(150);
+  display.clearDisplay();
+  display.display();
+}
+
+void showCountdown() {
+  for (int i = 3; i > 0; i--) {
+    display.clearDisplay();
+    display.setTextSize(3);
+    display.setCursor(50, 20);
+    display.print(i);
+    display.display();
+    tone(BUZZER_PIN, 700, 100);
+    delay(800);
+  }
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(35, 20);
+  display.print("YA!");
+  display.display();
+  tone(BUZZER_PIN, 1000, 300);
+  delay(600);
+}
+
+void showGameOver() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(30, 15);
+  display.println("Fin del juego!");
+  display.setCursor(20, 30);
+  display.print("Puntaje: ");
+  display.println(score);
+  if (score > highScore) {
+    display.setCursor(10, 45);
+    display.println("Nuevo Record!");
+    highScore = score;
+    EEPROM.write(0, highScore);
+    animateSmileyFace();
+  } else {
+    display.setCursor(20, 45);
+    display.print("Record: ");
+    display.println(highScore);
+  }
+  display.display();
+  delay(2000);
+  waitForRestart();
+}
+
+void waitForRestart() {
+  int startValue = analogRead(POT_PIN);
+  while (abs(analogRead(POT_PIN) - startValue) < 30) {
+    delay(10);
+  }
+  resetGame();
+  showCountdown();
+}
+
+void resetObstacle(Obstacle &ob) {
+  ob.w = 10;
+  ob.h = 8;
+  ob.x = random(0, SCREEN_WIDTH - ob.w);
+  ob.y = -random(10, 50);
+  ob.speed = random(2, maxObstacleSpeed);
+}
+
+void resetGame() {
+  for (int i = 0; i < numObstacles; i++) {
+    resetObstacle(obstacles[i]);
+  }
+  score = 0;
+  lives = 1;
+  gameOver = false;
+}
+
+void showPauseMenu() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(35, 25);
+  display.println("Juego en pausa");
+  display.setCursor(10, 45);
+  display.println("Pulsa para continuar");
+  display.display();
+}
+
+void showWelcome() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(25, 15);
+  display.println("Bienvenida Ammy, la mas linda de todas");
+  drawHeart();
+  display.display();
+  delay(4000);
+}
+
+void drawHeart() {
+  display.fillCircle(54, 36, 3, SSD1306_WHITE);
+  display.fillCircle(62, 36, 3, SSD1306_WHITE);
+  display.fillTriangle(50, 36, 66, 36, 58, 48, SSD1306_WHITE);
+}
+
+void animateSmileyFace() {
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(25, 10);
+  display.println(":)");
+  display.display();
+  delay(1500);
+}
+
